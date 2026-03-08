@@ -9,4 +9,7 @@
 
 // telegram
 
+// lark
+import './lark.js';
+
 // whatsapp
