@@ -47,10 +47,7 @@ export class LarkChannel implements Channel {
         url: 'https://open.feishu.cn/open-apis/bot/v3/info',
       });
       this.botOpenId = resp?.bot?.open_id || '';
-      logger.info(
-        { botOpenId: this.botOpenId },
-        'Lark bot info retrieved',
-      );
+      logger.info({ botOpenId: this.botOpenId }, 'Lark bot info retrieved');
     } catch (err) {
       logger.warn({ err }, 'Failed to get Lark bot info, continuing anyway');
     }
@@ -61,24 +58,34 @@ export class LarkChannel implements Channel {
     logger.info('Lark channel connected via WebSocket');
     console.log('\n  Lark bot connected via WebSocket');
     console.log(
-      '  Send any message to the bot to get a chat\'s registration ID\n',
+      "  Send any message to the bot to get a chat's registration ID\n",
     );
   }
 
   private async handleMessageEvent(data: any): Promise<void> {
-    logger.info({ keys: data ? Object.keys(data) : null }, 'Lark event received');
+    logger.info(
+      { keys: data ? Object.keys(data) : null },
+      'Lark event received',
+    );
     try {
       const event = data;
       const message = event?.message;
       const sender = event?.sender;
 
       if (!message || !sender) {
-        logger.info({ data: JSON.stringify(data).slice(0, 500) }, 'Lark: missing message or sender');
+        logger.info(
+          { data: JSON.stringify(data).slice(0, 500) },
+          'Lark: missing message or sender',
+        );
         return;
       }
 
       // Skip messages from the bot itself
       const senderOpenId = sender?.sender_id?.open_id || '';
+      logger.info(
+        { senderOpenId, botOpenId: this.botOpenId },
+        'Lark sender check',
+      );
       if (senderOpenId === this.botOpenId) return;
 
       const chatId = message.chat_id;
@@ -88,6 +95,11 @@ export class LarkChannel implements Channel {
       const timestamp = new Date(
         parseInt(message.create_time, 10) * 1000,
       ).toISOString();
+
+      logger.info(
+        { chatJid, messageType, content: message.content },
+        'Lark parsing message',
+      );
 
       // Parse message content
       const content = this.parseMessageContent(
@@ -102,15 +114,20 @@ export class LarkChannel implements Channel {
       // Determine if group chat
       const isGroup = message.chat_type === 'group';
 
+      logger.info(
+        { chatJid, senderName, content, isGroup },
+        'Lark message parsed',
+      );
+
       // Report chat metadata
       this.opts.onChatMetadata(chatJid, timestamp, undefined, 'lark', isGroup);
 
       // Only deliver messages for registered groups
       const group = this.opts.registeredGroups()[chatJid];
       if (!group) {
-        logger.debug(
+        logger.info(
           { chatJid, chatId },
-          'Message from unregistered Lark chat',
+          'Message from unregistered Lark chat — use this JID to register',
         );
         return;
       }
@@ -186,7 +203,8 @@ export class LarkChannel implements Channel {
                 if (el.tag === 'text') return el.text || '';
                 if (el.tag === 'a') return el.text || el.href || '';
                 if (el.tag === 'at') {
-                  if (el.user_id === this.botOpenId) return `@${ASSISTANT_NAME}`;
+                  if (el.user_id === this.botOpenId)
+                    return `@${ASSISTANT_NAME}`;
                   return `@${el.user_name || 'someone'}`;
                 }
                 if (el.tag === 'img') return '[Image]';

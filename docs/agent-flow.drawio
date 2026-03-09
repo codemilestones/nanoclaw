@@ -1,0 +1,135 @@
+<mxGraphModel>
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- Title -->
+    <mxCell id="title" value="NanoClaw Agent 整体流程图" style="text;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="200" y="10" width="400" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- 1. User Message -->
+    <mxCell id="user" value="用户发送消息&#xa;(飞书/Telegram/Slack...)" style="shape=parallelogram;rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="280" y="60" width="240" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- 2. Channel Layer -->
+    <mxCell id="channel" value="渠道层 (lark.ts / telegram.ts)&#xa;WebSocket / 轮询接收消息" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="140" width="240" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="e1" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="user" target="channel" parent="1"/>
+
+    <!-- 3. onMessage → SQLite -->
+    <mxCell id="sqlite" value="SQLite 数据库&#xa;storeMessage()" style="shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;size=10;" vertex="1" parent="1">
+      <mxGeometry x="310" y="220" width="180" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="e2" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="channel" target="sqlite" parent="1">
+      <mxGeometry as="geometry"/>
+    </mxCell>
+    <mxCell id="e2label" value="onMessage()" style="text;fontSize=10;fillColor=none;strokeColor=none;align=center;" vertex="1" parent="1">
+      <mxGeometry x="222" y="178" width="80" height="20" as="geometry"/>
+    </mxCell>
+
+    <!-- 4. Message Loop -->
+    <mxCell id="loop" value="消息循环 (index.ts)&#xa;每 2s 轮询 DB 新消息" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="305" width="240" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="e3" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="sqlite" target="loop" parent="1"/>
+
+    <!-- 5. Trigger Check -->
+    <mxCell id="trigger" value="触发检查&#xa;匹配 @银月 ?" style="rhombus;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="330" y="385" width="140" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="e4" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="loop" target="trigger" parent="1"/>
+
+    <!-- Skip branch -->
+    <mxCell id="skip" value="跳过&#xa;(累积等待)" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="530" y="398" width="90" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="e_skip" value="否" style="endArrow=classic;strokeColor=#999;dashed=1;" edge="1" source="trigger" target="skip" parent="1"/>
+
+    <!-- 6. Format Messages -->
+    <mxCell id="format" value="格式化消息为 XML&#xa;formatMessages()" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="500" width="240" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e5" value="是" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="trigger" target="format" parent="1"/>
+
+    <!-- ===== CONTAINER BOUNDARY ===== -->
+    <mxCell id="container_box" value="" style="rounded=1;dashed=1;dashPattern=5 5;fillColor=#f0f0f0;strokeColor=#999;strokeWidth=2;opacity=30;" vertex="1" parent="1">
+      <mxGeometry x="40" y="570" width="720" height="310" as="geometry"/>
+    </mxCell>
+    <mxCell id="container_label" value="🐳 隔离容器 (每群组独立)" style="text;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#666;" vertex="1" parent="1">
+      <mxGeometry x="50" y="575" width="250" height="25" as="geometry"/>
+    </mxCell>
+
+    <!-- 7. Container Runner -->
+    <mxCell id="runner" value="container-runner.ts&#xa;启动容器 / 注入密钥(stdin)" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="610" width="240" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e6" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="format" target="runner" parent="1"/>
+
+    <!-- 8. Agent Runner -->
+    <mxCell id="agent_runner" value="agent-runner/index.ts&#xa;降权 → 编译 → 启动" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="680" width="240" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e7" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="runner" target="agent_runner" parent="1"/>
+
+    <!-- 9. Claude Agent SDK query() - THE LLM CALL -->
+    <mxCell id="llm" value="⭐ Claude Agent SDK query()&#xa;调用 Anthropic LLM API&#xa;(流式响应)" style="rounded=1;fillColor=#FF6B6B;strokeColor=#CC0000;fontSize=12;fontStyle=1;fontColor=#fff;" vertex="1" parent="1">
+      <mxGeometry x="260" y="755" width="280" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="e8" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="agent_runner" target="llm" parent="1"/>
+
+    <!-- Tools box -->
+    <mxCell id="tools" value="工具调用&#xa;Bash / Read / Write&#xa;WebSearch / MCP..." style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="590" y="690" width="150" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="e_tools1" value="tool_use" style="endArrow=classic;strokeColor=#d6b656;exitX=1;exitY=0.3;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" source="llm" target="tools" parent="1"/>
+    <mxCell id="e_tools2" value="tool_result" style="endArrow=classic;strokeColor=#d6b656;exitX=0;exitY=1;entryX=1;entryY=0.7;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" source="tools" target="llm" parent="1"/>
+
+    <!-- IPC MCP -->
+    <mxCell id="ipc_mcp" value="IPC MCP Server&#xa;send_message&#xa;schedule_task" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="690" width="150" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="e_ipc1" value="MCP call" style="endArrow=classic;strokeColor=#d6b656;exitX=0;exitY=0.3;entryX=1;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" source="llm" target="ipc_mcp" parent="1"/>
+
+    <!-- 10. Stdout Streaming -->
+    <mxCell id="stdout" value="stdout 流式输出&#xa;---OUTPUT_START/END--- 标记" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="910" width="240" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e9" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="llm" target="stdout" parent="1"/>
+
+    <!-- 11. IPC Watcher -->
+    <mxCell id="ipc_watcher" value="IPC Watcher (ipc.ts)&#xa;扫描 /data/ipc/ 文件" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="60" y="780" width="150" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e_ipc2" value="JSON 文件" style="endArrow=classic;strokeColor=#9673a6;exitX=0.5;exitY=1;entryX=0.5;entryY=0;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" source="ipc_mcp" target="ipc_watcher" parent="1"/>
+
+    <!-- 12. Router -->
+    <mxCell id="router" value="router.ts&#xa;stripInternalTags()&#xa;routeOutbound()" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="985" width="240" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="e10" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="stdout" target="router" parent="1"/>
+
+    <!-- IPC also routes -->
+    <mxCell id="e_ipc3" style="endArrow=classic;strokeColor=#9673a6;dashed=1;exitX=0.5;exitY=1;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" source="ipc_watcher" target="router" parent="1"/>
+
+    <!-- 13. Channel Send -->
+    <mxCell id="channel_out" value="渠道层 sendMessage()&#xa;发送回飞书/Telegram/..." style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="280" y="1065" width="240" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e11" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="router" target="channel_out" parent="1"/>
+
+    <!-- 14. User receives -->
+    <mxCell id="user_recv" value="用户收到回复" style="shape=parallelogram;rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="310" y="1140" width="180" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="e12" style="endArrow=classic;strokeWidth=2;strokeColor=#333;" edge="1" source="channel_out" target="user_recv" parent="1"/>
+
+    <!-- Idle loop back -->
+    <mxCell id="idle_note" value="容器保持空闲 30min&#xa;新消息通过 IPC 注入&#xa;无需重启容器" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999;fontSize=10;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="590" y="780" width="150" height="55" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>
