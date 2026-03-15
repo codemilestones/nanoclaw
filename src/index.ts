@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 import {
   ASSISTANT_NAME,
@@ -52,6 +53,10 @@ import {
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
+
+// Memory system
+import { initializeMemorySystem, getMemorySystem } from './memory/index.js';
+import { autoCapture } from './memory/hooks.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -172,7 +177,13 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages, TIMEZONE);
+  // Format messages with memory recall if enabled
+  const { formatMessagesWithMemory } = await import('./router.js');
+  const prompt = await formatMessagesWithMemory(
+    missedMessages,
+    TIMEZONE,
+    group.folder,
+  );
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
@@ -203,6 +214,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, true);
   let hadError = false;
   let outputSentToUser = false;
+  let fullAgentResponse = '';
 
   const output = await runAgent(group, prompt, chatJid, async (result) => {
     // Streaming output callback — called for each agent result
@@ -213,6 +225,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
           : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+      fullAgentResponse += text + '\n';
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
@@ -233,6 +246,25 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
+
+  // Auto-capture: extract and store memories from the conversation
+  if (output === 'success' && !hadError) {
+    try {
+      const captureResult = await autoCapture(
+        missedMessages,
+        fullAgentResponse,
+        group.folder,
+      );
+      if (captureResult.stored > 0) {
+        logger.debug(
+          { group: group.name, stored: captureResult.stored },
+          'Auto-captured memories',
+        );
+      }
+    } catch (err) {
+      logger.warn({ error: err }, 'Auto-capture failed');
+    }
+  }
 
   if (output === 'error' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —
@@ -468,9 +500,28 @@ async function main(): Promise<void> {
   logger.info('Database initialized');
   loadState();
 
+  // Initialize memory system
+  const projectRoot = process.cwd();
+  const configDir = path.join(os.homedir(), '.config', 'nanoclaw');
+  const memoryConfigPath = path.join(configDir, 'memory.json');
+  const memorySystem = await initializeMemorySystem(
+    projectRoot,
+    memoryConfigPath,
+  );
+  if (memorySystem) {
+    logger.info('Memory system initialized');
+  } else {
+    logger.info('Memory system disabled or not configured');
+  }
+
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
+
+    // Close memory system
+    const { closeMemorySystem } = await import('./memory/index.js');
+    await closeMemorySystem();
+
     await queue.shutdown(10000);
     for (const ch of channels) await ch.disconnect();
     process.exit(0);

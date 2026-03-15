@@ -6,6 +6,8 @@ import { CronExpressionParser } from 'cron-parser';
 import { DATA_DIR, IPC_POLL_INTERVAL, TIMEZONE } from './config.js';
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
+import { processMemoryIpc } from './memory/tools.js';
+import { getMemorySystem } from './memory/index.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
@@ -171,6 +173,19 @@ export async function processTaskIpc(
     trigger?: string;
     requiresTrigger?: boolean;
     containerConfig?: RegisteredGroup['containerConfig'];
+    // For memory operations
+    content?: string;
+    category?: string;
+    scope?: string;
+    scopeId?: string;
+    importance?: number;
+    query?: string;
+    id?: string;
+    text?: string;
+    limit?: number;
+    minScore?: number;
+    includeGlobal?: boolean;
+    metadata?: Record<string, unknown>;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -448,6 +463,38 @@ export async function processTaskIpc(
         );
       }
       break;
+
+    // Memory system operations
+    case 'memory_store':
+    case 'memory_recall':
+    case 'memory_forget':
+    case 'memory_update':
+    case 'memory_list':
+    case 'memory_stats': {
+      const memorySystem = getMemorySystem();
+      if (!memorySystem || !memorySystem.isEnabled()) {
+        logger.warn(
+          { type: data.type },
+          'Memory operation requested but system not enabled',
+        );
+        break;
+      }
+
+      const memoryResult = await processMemoryIpc(
+        data,
+        sourceGroup,
+        isMain,
+        memorySystem,
+      );
+
+      if (!memoryResult.success) {
+        logger.warn(
+          { type: data.type, error: memoryResult.error },
+          'Memory operation failed',
+        );
+      }
+      break;
+    }
 
     default:
       logger.warn({ type: data.type }, 'Unknown IPC task type');

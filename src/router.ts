@@ -50,3 +50,29 @@ export function findChannel(
 ): Channel | undefined {
   return channels.find((c) => c.ownsJid(jid));
 }
+
+/**
+ * Format messages with memory recall injected.
+ * This is an async version that includes relevant memories from the memory system.
+ */
+export async function formatMessagesWithMemory(
+  messages: NewMessage[],
+  timezone: string,
+  groupFolder: string,
+): Promise<string> {
+  // Import memory hooks dynamically to avoid circular dependencies
+  const { autoRecall } = await import('./memory/hooks.js');
+
+  // Get auto-recall results
+  const memoryBlock = await autoRecall(messages, groupFolder);
+
+  // Format messages
+  const formattedMessages = formatMessages(messages, timezone);
+
+  // Inject memory block if we have results
+  if (memoryBlock) {
+    return `${formattedMessages}\n\n${memoryBlock}`;
+  }
+
+  return formattedMessages;
+}
