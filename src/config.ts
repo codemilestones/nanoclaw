@@ -58,9 +58,12 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Trigger pattern: @name at start of message
+// Note: \\b word boundary doesn't work with Chinese, so we don't use it
+// The @name prefix is unique enough in practice
 export const TRIGGER_PATTERN = new RegExp(
-  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
-  'i',
+  `^@${escapeRegex(ASSISTANT_NAME)}`,
+  'iu',
 );
 
 // Timezone for scheduled tasks (cron expressions, etc.)

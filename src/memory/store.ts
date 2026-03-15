@@ -316,9 +316,9 @@ export class MemoryStore {
       this.useLanceDB = true;
       logger.info('Using LanceDB for memory storage');
     } catch (err) {
-      logger.warn(
+      logger.info(
         { error: err },
-        'LanceDB not available, using in-memory storage',
+        'LanceDB not available, using JSON file storage (persistent)',
       );
       this.useLanceDB = false;
     }

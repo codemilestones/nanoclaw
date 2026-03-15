@@ -41,5 +41,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "optionalDependencies": {
+    "@lancedb/lancedb-linux-arm64-gnu": "^0.26.2"
   }
 }
