@@ -97,7 +97,7 @@ export class LarkChannel implements Channel {
       ).toISOString();
 
       logger.info(
-        { chatJid, messageType, content: message.content },
+        { chatJid, messageType, content: message.content, mentions: message.mentions },
         'Lark parsing message',
       );
 
