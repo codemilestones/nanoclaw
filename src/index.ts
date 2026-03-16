@@ -280,6 +280,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   // End total timing and report if PERF_DEBUG is enabled
   timer.end(label);
+  // Debug: log PERF_DEBUG status
+  const perfDebugValue = process.env.PERF_DEBUG;
+  if (perfDebugValue === 'true') {
+    console.log(`[PERF] PERF_DEBUG is enabled, value=${perfDebugValue}`);
+  }
   if (isPerfDebugEnabled()) {
     timer.log(label, timer.getDuration(label));
     // Report memory timing breakdown
@@ -526,6 +531,8 @@ async function main(): Promise<void> {
   // Load .env file into process.env for memory system and other features
   const { config: loadEnv } = await import('dotenv');
   const envResult = loadEnv();
+  // Debug: verify PERF_DEBUG is loaded
+  console.log(`[DEBUG] PERF_DEBUG after dotenv: ${process.env.PERF_DEBUG}`);
   if (envResult.error) {
     // .env file might not exist, that's okay
     logger.debug({ error: envResult.error }, '.env file not found (optional)');
