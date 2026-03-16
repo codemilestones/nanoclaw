@@ -6,7 +6,10 @@
  * Simple hierarchical performance timer
  */
 export class PerfTimer {
-  private checkpoints: Map<string, { start: number; end?: number; parent?: string }> = new Map();
+  private checkpoints: Map<
+    string,
+    { start: number; end?: number; parent?: string }
+  > = new Map();
   private enabled: boolean;
 
   constructor(enabled: boolean = true) {
@@ -72,7 +75,8 @@ export class PerfTimer {
     indent: string,
     lines: string[],
   ): void {
-    const duration = data.end !== undefined ? (data.end - data.start).toFixed(0) : '...';
+    const duration =
+      data.end !== undefined ? (data.end - data.start).toFixed(0) : '...';
     lines.push(`${indent}${label}: ${duration}ms`);
 
     // Find children
@@ -88,7 +92,11 @@ export class PerfTimer {
   /**
    * Log a timing value immediately
    */
-  log(label: string, durationMs: number, extra?: Record<string, unknown>): void {
+  log(
+    label: string,
+    durationMs: number,
+    extra?: Record<string, unknown>,
+  ): void {
     if (!this.enabled) return;
     const extraStr = extra ? ` ${JSON.stringify(extra)}` : '';
     console.log(`[PERF] ${label}: ${durationMs.toFixed(0)}ms${extraStr}`);

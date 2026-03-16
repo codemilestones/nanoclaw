@@ -224,7 +224,7 @@ export async function autoCapture(
     const messagesForExtraction = messages.map((m) => ({
       text: m.content,
       sender: m.sender_name,
-      isFromUser: !m.is_from_me,  // is_from_me=true means bot message, so invert for user check
+      isFromUser: !m.is_from_me, // is_from_me=true means bot message, so invert for user check
     }));
 
     // Extract and store memories
