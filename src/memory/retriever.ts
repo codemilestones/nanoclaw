@@ -21,6 +21,7 @@ import { EmbeddingService } from './embedding.js';
 import { MemoryStore } from './store.js';
 import { expandEnv } from './config.js';
 import { logger } from '../logger.js';
+import { getPerfTimer } from '../utils/performance.js';
 
 /**
  * RRF (Reciprocal Rank Fusion) constant
@@ -294,6 +295,10 @@ export class MemoryRetriever {
    * Search memories with hybrid retrieval
    */
   async search(query: MemorySearchQuery): Promise<MemorySearchResult[]> {
+    const timer = getPerfTimer();
+    const searchLabel = `memorySearch[${query.query.slice(0, 20).replace(/\s/g, '_')}]`;
+    timer.start(searchLabel);
+
     const {
       query: queryText,
       scope,
@@ -322,13 +327,18 @@ export class MemoryRetriever {
     // Vector search
     if (this.config.mode === 'vector' || this.config.mode === 'hybrid') {
       try {
+        timer.start(`${searchLabel}/embedding`);
         const queryEmbed = await this.embedding.embed(queryText, 'query');
+        timer.end(`${searchLabel}/embedding`);
+
+        timer.start(`${searchLabel}/vectorSearch`);
         const vectorResults = await this.memoryStore.vectorSearch(queryEmbed, {
           limit: this.config.candidatePoolSize,
           scope,
           scopeId,
           categories,
         });
+        timer.end(`${searchLabel}/vectorSearch`);
 
         for (let i = 0; i < vectorResults.length; i++) {
           const { memory, score } = vectorResults[i];
@@ -353,12 +363,14 @@ export class MemoryRetriever {
     // BM25/FTS search
     if (this.config.mode === 'bm25' || this.config.mode === 'hybrid') {
       try {
+        timer.start(`${searchLabel}/bm25Search`);
         const ftsResults = await this.memoryStore.ftsSearch(queryText, {
           limit: this.config.candidatePoolSize,
           scope,
           scopeId,
           categories,
         });
+        timer.end(`${searchLabel}/bm25Search`);
 
         for (let i = 0; i < ftsResults.length; i++) {
           const { memory, score } = ftsResults[i];
@@ -432,12 +444,14 @@ export class MemoryRetriever {
     // Apply cross-encoder reranking
     let rerankedScores = new Map<string, number>();
     if (rerank && this.reranker.isEnabled()) {
+      timer.start(`${searchLabel}/reranking`);
       const memoriesToRerank = combined
         .sort((a, b) => b.score - a.score)
         .slice(0, this.config.rerank.topK || 10)
         .map((r) => r.memory);
 
       rerankedScores = await this.reranker.rerank(queryText, memoriesToRerank);
+      timer.end(`${searchLabel}/reranking`);
     }
 
     // Apply reranker scores
@@ -454,11 +468,16 @@ export class MemoryRetriever {
     combined.sort((a, b) => b.score - a.score);
 
     // Apply MMR for diversity
+    timer.start(`${searchLabel}/mmrEmbedding`);
     const queryEmbed = await this.embedding.embed(queryText, 'query');
+    timer.end(`${searchLabel}/mmrEmbedding`);
+
+    timer.start(`${searchLabel}/mmrDiversify`);
     const diversified =
       mmrLambda > 0 && mmrLambda < 1
         ? MMRReranker.diversify(combined, queryEmbed, mmrLambda)
         : combined;
+    timer.end(`${searchLabel}/mmrDiversify`);
 
     // Filter by min score
     let results = diversified.filter((r) => r.score >= minScore);
@@ -498,6 +517,7 @@ export class MemoryRetriever {
     results = results.slice(0, limit);
 
     // Update access count for retrieved memories
+    timer.start(`${searchLabel}/updateAccessCount`);
     for (const result of results) {
       await this.memoryStore
         .update(result.memory.id, {
@@ -508,7 +528,9 @@ export class MemoryRetriever {
           // Ignore update errors
         });
     }
+    timer.end(`${searchLabel}/updateAccessCount`);
 
+    timer.end(searchLabel);
     return results.map((r) => ({
       memory: r.memory,
       score: r.score,

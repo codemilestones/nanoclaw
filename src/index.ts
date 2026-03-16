@@ -58,6 +58,9 @@ import { logger } from './logger.js';
 import { initializeMemorySystem, getMemorySystem } from './memory/index.js';
 import { autoCapture } from './memory/hooks.js';
 
+// Performance monitoring
+import { getPerfTimer, isPerfDebugEnabled } from './utils/performance.js';
+
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
 
@@ -146,6 +149,10 @@ export function _setRegisteredGroups(
  * Called by the GroupQueue when it's this group's turn.
  */
 async function processGroupMessages(chatJid: string): Promise<boolean> {
+  const timer = getPerfTimer();
+  const label = `processGroupMessages[${chatJid}]`;
+  timer.start(label);
+
   const group = registeredGroups[chatJid];
   if (!group) return true;
 
@@ -247,6 +254,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
+  timer.start(`${label}/autoCapture`);
   // Auto-capture: extract and store memories from the conversation
   if (output === 'success' && !hadError) {
     try {
@@ -255,6 +263,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         fullAgentResponse,
         group.folder,
       );
+      timer.end(`${label}/autoCapture`);
       if (captureResult.stored > 0) {
         logger.debug(
           { group: group.name, stored: captureResult.stored },
@@ -262,7 +271,26 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         );
       }
     } catch (err) {
+      timer.end(`${label}/autoCapture`);
       logger.warn({ error: err }, 'Auto-capture failed');
+    }
+  } else {
+    timer.end(`${label}/autoCapture`);
+  }
+
+  // End total timing and report if PERF_DEBUG is enabled
+  timer.end(label);
+  if (isPerfDebugEnabled()) {
+    timer.log(label, timer.getDuration(label));
+    // Report memory timing breakdown
+    const memoryLabel = `formatMessagesWithMemory[${group.folder.split('/').pop()}]`;
+    const memoryTime = timer.getDuration(memoryLabel);
+    if (memoryTime > 0) {
+      timer.log('  memory_recall_total', memoryTime);
+      const recallTime = timer.getDuration(`${memoryLabel}/autoRecall`);
+      if (recallTime > 0) timer.log('    autoRecall', recallTime);
+      const formatTime = timer.getDuration(`${memoryLabel}/formatMessages`);
+      if (formatTime > 0) timer.log('    formatMessages', formatTime);
     }
   }
 

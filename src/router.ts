@@ -1,5 +1,6 @@
 import { Channel, NewMessage } from './types.js';
 import { formatLocalTime } from './timezone.js';
+import { getPerfTimer, isPerfDebugEnabled } from './utils/performance.js';
 
 export function escapeXml(s: string): string {
   if (!s) return '';
@@ -63,16 +64,27 @@ export async function formatMessagesWithMemory(
   // Import memory hooks dynamically to avoid circular dependencies
   const { autoRecall } = await import('./memory/hooks.js');
 
+  // Performance tracking
+  const timer = getPerfTimer();
+  const outerLabel = `formatMessagesWithMemory[${groupFolder.split('/').pop()}]`;
+  timer.start(outerLabel);
+
   // Get auto-recall results
+  timer.start(`${outerLabel}/autoRecall`);
   const memoryBlock = await autoRecall(messages, groupFolder);
+  timer.end(`${outerLabel}/autoRecall`);
 
   // Format messages
+  timer.start(`${outerLabel}/formatMessages`);
   const formattedMessages = formatMessages(messages, timezone);
+  timer.end(`${outerLabel}/formatMessages`);
 
   // Inject memory block if we have results
   if (memoryBlock) {
+    timer.end(outerLabel);
     return `${formattedMessages}\n\n${memoryBlock}`;
   }
 
+  timer.end(outerLabel);
   return formattedMessages;
 }

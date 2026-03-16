@@ -15,6 +15,7 @@ import {
 } from './index.js';
 import { extractAndStoreMemories } from './extractor.js';
 import { logger } from '../logger.js';
+import { getPerfTimer, isPerfDebugEnabled } from '../utils/performance.js';
 
 /**
  * Format recall results for injection into messages
@@ -104,23 +105,33 @@ export async function autoRecall(
     minScore?: number;
   },
 ): Promise<string> {
+  const timer = getPerfTimer();
+  const label = 'autoRecall';
+  timer.start(label);
+
   const memorySystem = getMemorySystem();
   if (
     !memorySystem ||
     !memorySystem.isEnabled() ||
     !memorySystem.isAutoRecallEnabled()
   ) {
+    timer.end(label);
     return '';
   }
 
   // Check if auto-recall is disabled
   if (options?.enabled === false) {
+    timer.end(label);
     return '';
   }
 
   // Get the last user message for querying
+  timer.start(`${label}/filterMessages`);
   const userMessages = messages.filter((m) => m.is_from_me);
+  timer.end(`${label}/filterMessages`);
+
   if (userMessages.length === 0) {
+    timer.end(label);
     return '';
   }
 
@@ -128,18 +139,26 @@ export async function autoRecall(
   const query = lastMessage.content;
 
   // Check if we should skip retrieval for this query
-  if (shouldSkipRetrieval(query)) {
+  timer.start(`${label}/shouldSkip`);
+  const shouldSkip = shouldSkipRetrieval(query);
+  timer.end(`${label}/shouldSkip`);
+
+  if (shouldSkip) {
     logger.debug(
       { query: query.slice(0, 50) },
       'Skipping auto-recall for low-value query',
     );
+    timer.end(label);
     return '';
   }
 
   try {
+    timer.start(`${label}/getConfig`);
     const autoRecallConfig = memorySystem.getAutoRecallConfig();
     const adaptiveParams = adaptiveRetrievalParams(query);
+    timer.end(`${label}/getConfig`);
 
+    timer.start(`${label}/search`);
     const results = await memorySystem.search({
       query,
       scope: 'group',
@@ -149,18 +168,25 @@ export async function autoRecall(
       minScore: options?.minScore || autoRecallConfig.topK > 3 ? 0.4 : 0.35,
       includeGlobal: true,
     });
+    timer.end(`${label}/search`);
 
     if (results.length > 0) {
       logger.debug(
         { count: results.length, scopeId: groupFolder },
         'Auto-recall: retrieved memories',
       );
-      return formatRecallResults(results);
+      timer.start(`${label}/formatResults`);
+      const formatted = formatRecallResults(results);
+      timer.end(`${label}/formatResults`);
+      timer.end(label);
+      return formatted;
     }
 
+    timer.end(label);
     return '';
   } catch (err) {
     logger.warn({ error: err }, 'Auto-recall failed');
+    timer.end(label);
     return '';
   }
 }
@@ -198,7 +224,7 @@ export async function autoCapture(
     const messagesForExtraction = messages.map((m) => ({
       text: m.content,
       sender: m.sender_name,
-      isFromUser: m.is_from_me,
+      isFromUser: !m.is_from_me,  // is_from_me=true means bot message, so invert for user check
     }));
 
     // Extract and store memories
