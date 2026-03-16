@@ -65,7 +65,7 @@ function getDefaultEmbeddingConfig(): EmbeddingProviderConfig {
   const configs: Record<string, EmbeddingProviderConfig> = {
     jina: {
       provider: 'jina',
-      apiKey: '${JINA_API_KEY}',
+      apiKey: apiKey || '${JINA_API_KEY}',
       model: process.env.MEMORY_EMBEDDING_MODEL || 'jina-embeddings-v3',
       baseURL: 'https://api.jina.ai/v1',
       dimensions: parseInt(
