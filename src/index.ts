@@ -495,6 +495,20 @@ function ensureContainerSystemRunning(): void {
 }
 
 async function main(): Promise<void> {
+  // Load .env file into process.env for memory system and other features
+  import('dotenv').then((dotenv) => {
+    const result = dotenv.config();
+    if (result.error) {
+      // .env file might not exist, that's okay
+      logger.debug({ error: result.error }, '.env file not found (optional)');
+    } else if (result.parsed) {
+      logger.debug(
+        { keys: Object.keys(result.parsed) },
+        'Environment variables loaded from .env',
+      );
+    }
+  });
+
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
