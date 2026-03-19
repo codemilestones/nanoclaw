@@ -37,7 +37,7 @@ ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 RUN npm config set registry https://registry.npmmirror.com
 
 # Install agent-browser and claude-code globally
-RUN npm install -g agent-browser @anthropic-ai/claude-code
+RUN npm install -g agent-browser @anthropic-ai/claude-code @larksuiteoapi/lark-mcp
 
 # Create app directory
 WORKDIR /app
