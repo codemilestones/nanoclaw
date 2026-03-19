@@ -150,7 +150,9 @@ export function _setRegisteredGroups(
  */
 async function processGroupMessages(chatJid: string): Promise<boolean> {
   const timer = getPerfTimer();
-  const label = `processGroupMessages[${chatJid}]`;
+  // Use a simpler label that can be matched later
+  const label = `processGroupMessages`;
+  const groupKey = chatJid;
   timer.start(label);
 
   const group = registeredGroups[chatJid];
@@ -158,7 +160,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   const channel = findChannel(channels, chatJid);
   if (!channel) {
-    logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+    timer.end(label);
     return true;
   }
 
@@ -171,7 +173,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     ASSISTANT_NAME,
   );
 
-  if (missedMessages.length === 0) return true;
+  if (missedMessages.length === 0) {
+    timer.end(label);
+    return true;
+  }
 
   // For non-main groups, check if trigger is required and present
   if (!isMainGroup && group.requiresTrigger !== false) {
@@ -181,7 +186,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         TRIGGER_PATTERN.test(m.content.trim()) &&
         (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
     );
-    if (!hasTrigger) return true;
+    if (!hasTrigger) {
+      timer.end(label);
+      return true;
+    }
   }
 
   // Format messages with memory recall if enabled
@@ -190,6 +198,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     missedMessages,
     TIMEZONE,
     group.folder,
+    timer,
+    label,
   );
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
@@ -280,23 +290,22 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   // End total timing and report if PERF_DEBUG is enabled
   timer.end(label);
-  // Debug: log PERF_DEBUG status
-  const perfDebugValue = process.env.PERF_DEBUG;
-  if (perfDebugValue === 'true') {
-    console.log(`[PERF] PERF_DEBUG is enabled, value=${perfDebugValue}`);
-  }
+
   if (isPerfDebugEnabled()) {
-    timer.log(label, timer.getDuration(label));
-    // Report memory timing breakdown
-    const memoryLabel = `formatMessagesWithMemory[${group.folder.split('/').pop()}]`;
-    const memoryTime = timer.getDuration(memoryLabel);
-    if (memoryTime > 0) {
-      timer.log('  memory_recall_total', memoryTime);
-      const recallTime = timer.getDuration(`${memoryLabel}/autoRecall`);
-      if (recallTime > 0) timer.log('    autoRecall', recallTime);
-      const formatTime = timer.getDuration(`${memoryLabel}/formatMessages`);
-      if (formatTime > 0) timer.log('    formatMessages', formatTime);
+    const totalTime = timer.getDuration(label);
+    timer.log(label, totalTime);
+
+    // Report child timings
+    const children = ['formatMessagesWithMemory', 'autoCapture', 'runAgent'];
+    for (const child of children) {
+      const childTime = timer.getDuration(`${label}/${child}`);
+      if (childTime > 0) {
+        timer.log(`  ${child}`, childTime);
+      }
     }
+
+    // Clear checkpoints after reporting to avoid accumulation
+    timer.clear();
   }
 
   if (output === 'error' || hadError) {

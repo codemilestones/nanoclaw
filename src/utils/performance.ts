@@ -21,7 +21,7 @@ export class PerfTimer {
    */
   start(label: string, parent?: string): void {
     if (!this.enabled) return;
-    this.checkpoints.set(label, { start: performance.now(), parent });
+    this.checkpoints.set(label, { start: Date.now(), parent });
   }
 
   /**
@@ -31,8 +31,9 @@ export class PerfTimer {
     if (!this.enabled) return 0;
     const checkpoint = this.checkpoints.get(label);
     if (!checkpoint) return 0;
-    const duration = performance.now() - checkpoint.start;
-    this.checkpoints.set(label, { ...checkpoint, end: performance.now() });
+    const now = Date.now();
+    const duration = now - checkpoint.start;
+    this.checkpoints.set(label, { ...checkpoint, end: now });
     return duration;
   }
 

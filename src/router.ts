@@ -1,5 +1,6 @@
 import { Channel, NewMessage } from './types.js';
 import { formatLocalTime } from './timezone.js';
+import type { PerfTimer } from './utils/performance.js';
 import { getPerfTimer, isPerfDebugEnabled } from './utils/performance.js';
 
 export function escapeXml(s: string): string {
@@ -60,31 +61,34 @@ export async function formatMessagesWithMemory(
   messages: NewMessage[],
   timezone: string,
   groupFolder: string,
+  timer?: PerfTimer,
+  parentLabel?: string,
 ): Promise<string> {
   // Import memory hooks dynamically to avoid circular dependencies
   const { autoRecall } = await import('./memory/hooks.js');
 
   // Performance tracking
-  const timer = getPerfTimer();
-  const outerLabel = `formatMessagesWithMemory[${groupFolder.split('/').pop()}]`;
-  timer.start(outerLabel);
+  const perfTimer = timer ?? getPerfTimer();
+  const outerLabel = parentLabel
+    ? `${parentLabel}/formatMessagesWithMemory`
+    : 'formatMessagesWithMemory';
+  perfTimer.start(outerLabel);
 
   // Get auto-recall results
-  timer.start(`${outerLabel}/autoRecall`);
+  perfTimer.start(`${outerLabel}/autoRecall`);
   const memoryBlock = await autoRecall(messages, groupFolder);
-  timer.end(`${outerLabel}/autoRecall`);
+  perfTimer.end(`${outerLabel}/autoRecall`);
 
   // Format messages
-  timer.start(`${outerLabel}/formatMessages`);
+  perfTimer.start(`${outerLabel}/formatMessages`);
   const formattedMessages = formatMessages(messages, timezone);
-  timer.end(`${outerLabel}/formatMessages`);
+  perfTimer.end(`${outerLabel}/formatMessages`);
 
   // Inject memory block if we have results
+  perfTimer.end(outerLabel);
   if (memoryBlock) {
-    timer.end(outerLabel);
     return `${formattedMessages}\n\n${memoryBlock}`;
   }
 
-  timer.end(outerLabel);
   return formattedMessages;
 }
