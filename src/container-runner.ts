@@ -204,7 +204,12 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'LARK_APP_ID', 'LARK_APP_SECRET']);
+  return readEnvFile([
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'LARK_APP_ID',
+    'LARK_APP_SECRET',
+  ]);
 }
 
 function buildContainerArgs(
@@ -212,7 +217,15 @@ function buildContainerArgs(
   containerName: string,
   isMain: boolean,
 ): string[] {
-  const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+  const args: string[] = [
+    'run',
+    '-i',
+    '--rm',
+    '--memory',
+    '4g',
+    '--name',
+    containerName,
+  ];
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
